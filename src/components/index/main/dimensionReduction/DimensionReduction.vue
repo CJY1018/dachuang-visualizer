@@ -1,0 +1,647 @@
+<template>
+  <div id="dim-red">
+    <div id="dim-red-title">
+      降维显示效果图
+    </div>
+    <div id="dim-red-body">
+      <!--            <svg id="MainSVG" ref="MainSVG"></svg>-->
+      <div id="main"></div>
+    </div>
+  </div>
+</template>
+
+<script>
+//引入d3库
+import * as d3 from 'd3';
+//引入echarts库
+import * as echarts from 'echarts';
+import ecStat from 'echarts-stat';
+
+export default {
+  name: "DimensionReduction",
+
+  data() {
+    return {
+      dataset: [],
+      selectedFunc: false, // false: 查看，true: 删除
+      selectedDelPointList: [],
+      selectedPointList: [],
+      minOod: 0,
+      maxOod: 0,
+      groupNum: 5,
+    }
+  },
+
+  methods: {
+    paint1() {
+      let width = this.$refs.MainSVG.clientWidth;
+      let height = this.$refs.MainSVG.clientHeight;
+      d3.csv("static/data训练后PCA.csv").then(dataset => {
+            //画散点图
+            d3.select('#MainSVG').selectAll('circle')
+                .data(dataset)
+                .enter()
+                .append('circle')
+                .attr('cx', function (d) {
+                  return d.x * 20 + width / 2.2;
+                })
+                .attr('cy', function (d) {
+                  return -d.y * 1500 + height / 2;
+                })
+                .attr('r', 3)
+                .attr('fill', function (d) {
+                  switch (d.label) {
+                    case '0':
+                      return 'green';
+                    case '1':
+                      return 'blue';
+                    case '2':
+                      return 'red';
+                  }
+                })
+          }
+      )
+      //屏幕缩放时
+      window.onresize = () => {
+        //清空画布
+        d3.select('#MainSVG').selectAll('circle').remove();
+        this.paint();
+      };
+
+    },
+    paint2(filePath) {
+      // 读取数据
+      d3.csv(filePath).then(dataset => {
+        this.dataset = dataset;
+        let ood = [];
+        let maxOod = this.dataset[0].ood_score, minOod = this.dataset[0].ood_score;
+        for (let i = 0; i < this.dataset.length; i++) {
+          if (!isNaN(this.dataset[i].ood_score)) {
+            this.dataset[i].ood_score = parseFloat(this.dataset[i].ood_score);
+            ood.push(this.dataset[i].ood_score);
+            //找到最大最小值
+            if (this.dataset[i].ood_score > maxOod) {
+              maxOod = this.dataset[i].ood_score;
+            } else if (this.dataset[i].ood_score < minOod) {
+              minOod = this.dataset[i].ood_score;
+            }
+          }
+        }
+        this.minOod = minOod;
+        this.maxOod = maxOod;
+
+        // 发送ood_score区间
+        this.$bus.$emit('sendOodScoreRange', minOod, maxOod);
+        // 发送ood_score
+        this.$bus.$emit('sendOodScoreList', ood, minOod, maxOod);
+
+        let chartDom = document.getElementById('main');
+        let myChart = echarts.init(chartDom);
+        let option;
+
+        option = {
+          title: {
+            text: 'Old points and new points distribution',
+          },
+          grid: {
+            left: '3%',
+            right: '7%',
+            bottom: '7%',
+            containLabel: true
+          },
+          tooltip: {
+            // trigger: 'axis',
+            showDelay: 0,
+            formatter: function (params) {
+              if (params.value.length > 1) {
+                return (
+                    params.seriesName +
+                    ' :<br/>' +
+                    params.value[0] +
+                    'px ' +
+                    params.value[1] +
+                    'px '
+                );
+              } else {
+                return (
+                    params.seriesName +
+                    ' :<br/>' +
+                    params.name +
+                    ' : ' +
+                    params.value +
+                    'px '
+                );
+              }
+            },
+          },
+          toolbox: {
+            feature: {
+              dataZoom: {},
+              brush: {
+                type: ['rect', 'polygon', 'clear']
+              }
+            }
+          },
+          brush: {},
+          legend: {
+            title: 'Legend',
+            data: ['0', '1', '2'],
+            left: 'center',
+            bottom: 10
+          },
+          xAxis: [
+            {
+              type: 'value',
+              scale: true,
+              axisLabel: {
+                formatter: '{value} px'
+              },
+              splitLine: {
+                show: false
+              }
+            }
+          ],
+          yAxis: [
+            {
+              type: 'value',
+              scale: true,
+              axisLabel: {
+                formatter: '{value} px'
+              },
+              splitLine: {
+                show: false
+              }
+            }
+          ],
+          series: [
+            {
+              name: '0',
+              type: 'scatter',
+              symbolSize: 6,
+              emphasis: {
+                focus: 'series'
+              },
+              // prettier-ignore
+              data: this.dataset.map(function (item) {
+                if (item.label === '0')
+                  return [item.x, item.y];
+              }),
+            },
+            {
+              name: '1',
+              type: 'scatter',
+              symbolSize: 6,
+              emphasis: {
+                focus: 'series'
+              },
+              // prettier-ignore
+              data: this.dataset.map(function (item) {
+                if (item.label === '1')
+                  return [item.x, item.y];
+              }),
+            },
+            {
+              name: '2',
+              type: 'scatter',
+              symbolSize: 6,
+              emphasis: {
+                focus: 'series'
+              },
+              // prettier-ignore
+              data: this.dataset.map(function (item) {
+                if (item.label === '2') {
+                  return [item.x, item.y];
+                }
+              }),
+            },
+          ]
+        };
+
+        option.animationThreshold = 8000;
+        option && myChart.setOption(option);
+        this.option = option;
+        this.dimensionReductionChart = myChart;
+
+        let bus = this.$bus;
+
+        function renderBrushed(params) {
+          if (params.batch[0].selected[2] && params.batch[0].selected[1] && params.batch[0].selected[0]) {
+            // 输出被选中点的下标
+            let selectedIndices1 = params.batch[0].selected[0].dataIndex;
+            let selectedIndices2 = params.batch[0].selected[1].dataIndex;
+            let selectedIndices3 = params.batch[0].selected[2].dataIndex;
+            let length = selectedIndices1.length + selectedIndices2.length + selectedIndices3.length
+
+            if (_this.selectedFunc === false) { //查看
+              bus.$emit('sendPointsLength', selectedIndices1.length + selectedIndices2.length + selectedIndices3.length); // 发送被选中的点的数量
+              let selectedIndices = selectedIndices1.concat(selectedIndices2).concat(selectedIndices3);
+              let selectedPoints = [];
+              for (let i = 0; i < selectedIndices.length; i++) {
+                selectedPoints.push(_this.dataset[selectedIndices[i]]);
+              }
+              _this.selectedPointList = selectedPoints;
+            } else if (length > 0) { //删除
+              selectedIndices1.forEach(function (item) {
+                _this.selectedDelPointList.push({
+                  index: item,
+                  data: _this.dataset[item],
+                  type: 0
+                })
+                _this.dataset[item] = null;
+                option.series[0].data[item] = null;
+              });
+              selectedIndices2.forEach(function (item) {
+                _this.selectedDelPointList.push({
+                  index: item,
+                  data: _this.dataset[item],
+                  type: 1
+                })
+                _this.dataset[item] = null;
+                option.series[1].data[item] = null;
+              });
+              selectedIndices3.forEach(function (item) {
+                _this.selectedDelPointList.push({
+                  index: item,
+                  data: _this.dataset[item],
+                  type: 2
+                })
+                _this.dataset[item] = null;
+                option.series[2].data[item] = null;
+              });
+              myChart.setOption(option);
+            }
+          } else if (_this.dimensionReductionChart._chartsViews) {
+            bus.$emit('sendPointsLength', params.batch[0].selected[0].dataIndex.length); // 发送被选中的点的数量
+          }
+          // myChart.setOption(option);
+        }
+
+        let _this = this;
+
+        //  输出选中的点
+        myChart.on('brushSelected', renderBrushed);
+        // 点击点时
+        myChart.on('click', function (params) {
+          if (_this.selectedFunc === false) { //查看
+            _this.selectedPointList = [_this.dataset[params.dataIndex]];
+            _this.$bus.$emit('sendSelectedPoint', _this.dataset[params.dataIndex]);
+          } else { //删除
+            _this.selectedDelPointList.push({
+              index: params.dataIndex,
+              data: _this.dataset[params.dataIndex],
+              type: parseInt(params.seriesName)
+            })
+            _this.dataset[params.dataIndex] = null;
+            if (params.data.length === 2)
+              option.series[params.seriesIndex].data[params.dataIndex] = null;
+            else
+              option.series.data[params.dataIndex] = null;
+            myChart.setOption(option);
+          }
+        });
+      });
+    },
+    paint3() {
+      d3.csv("static/data训练后PCA.csv").then(dataset => {
+        let points1 = [];
+        let points2 = [];
+        let points3 = [];
+        for (let i = 0; i < dataset.length; i++) {
+          points1.push([parseFloat(dataset[i].x), parseFloat(dataset[i].y)]);
+          /*switch (dataset[i].label) {
+            case "0":
+              points1.push([parseFloat(dataset[i].x), parseFloat(dataset[i].y)]);
+              break;
+            case "1":
+              points2.push([parseFloat(dataset[i].x), parseFloat(dataset[i].y)]);
+              break;
+            case "2":
+              points3.push([parseFloat(dataset[i].x), parseFloat(dataset[i].y)]);
+              break;
+          }*/
+        }
+
+        var chartDom = document.getElementById('main');
+        var myChart = echarts.init(chartDom);
+        var option;
+
+// See https://github.com/ecomfe/echarts-stat
+        echarts.registerTransform(ecStat.transform.clustering);
+        var CLUSTER_COUNT = 6;
+        var DIENSIION_CLUSTER_INDEX = 2;
+        var COLOR_ALL = [
+          '#37A2DA',
+          '#e06343',
+          '#37a354',
+          '#b55dba',
+          '#b5bd48',
+          '#8378EA',
+          '#96BFFF'
+        ];
+        var pieces = [];
+        for (var i = 0; i < CLUSTER_COUNT; i++) {
+          pieces.push({
+            value: i,
+            label: 'cluster ' + i,
+            color: COLOR_ALL[i]
+          });
+        }
+        option = {
+          dataset: [
+            {
+              source: points1
+            },
+            {
+              transform: {
+                type: 'ecStat:clustering',
+                // print: true,
+                config: {
+                  clusterCount: CLUSTER_COUNT,
+                  outputType: 'single',
+                  outputClusterIndexDimension: DIENSIION_CLUSTER_INDEX
+                }
+              }
+            }
+          ],
+          tooltip: {
+            position: 'top'
+          },
+          visualMap: {
+            type: 'piecewise',
+            top: 'middle',
+            min: 0,
+            max: CLUSTER_COUNT,
+            left: 10,
+            splitNumber: CLUSTER_COUNT,
+            dimension: DIENSIION_CLUSTER_INDEX,
+            pieces: pieces
+          },
+          grid: {
+            left: 120
+          },
+          xAxis: {},
+          yAxis: {},
+          series: {
+            type: 'scatter',
+            encode: {tooltip: [0, 1]},
+            symbolSize: 15,
+            itemStyle: {
+              borderColor: '#555'
+            },
+            datasetIndex: 1
+          }
+        };
+
+        option && myChart.setOption(option);
+
+      })
+
+    },
+    withdraw() {
+      if (this.selectedDelPointList.length <= 0) {
+        alert("已经没有删除的点可以撤回了哟~")
+        return;
+      }
+      /*let myChart = echarts.init(this.chartDom);
+      let option = this.option;*/
+      let myChart = this.dimensionReductionChart;
+      let option = this.option;
+      let tail = this.selectedDelPointList.pop();
+      let index = tail.index
+      let type = tail.type
+      let data = tail.data;
+      option.series[type].data[index] = [data.x, data.y]
+      this.dataset[index] = data;
+      option.animation = false;
+      myChart.setOption(option);
+      option.animation = true;
+      myChart.setOption(option);
+    },
+    withdraw10() {
+      if (this.selectedDelPointList.length <= 0) {
+        alert("已经没有删除的点可以撤回了哟~")
+        return;
+      }
+      let myChart = this.dimensionReductionChart;
+      let option = this.option;
+      let length = this.selectedDelPointList.length;
+      for (let i = 0; i < Math.min(length, 10); i++) {
+        let tail = this.selectedDelPointList.pop();
+        let index = tail.index
+        let type = tail.type
+        let data = tail.data;
+        option.series[type].data[index] = [data.x, data.y]
+        this.dataset[index] = data
+      }
+      option.animation = false;
+      myChart.setOption(option);
+      option.animation = true;
+      myChart.setOption(option);
+    },
+    analyse(selectedGroup) {
+      let myChart = this.dimensionReductionChart;
+      let option = this.option;
+      // 定义分组的宽度
+      let groupWidth = (this.maxOod - this.minOod) / selectedGroup.length;
+      for (let j = 0; j < this.dataset.length; j++) {
+        if (this.dataset[j] && this.dataset[j].label === '1') {
+          let index = Math.floor((this.dataset[j].ood_score - this.minOod) / groupWidth);
+          if (index >= selectedGroup.length) {
+            index = this.groupNum - 1;
+          }
+          if (selectedGroup[index]) {
+            option.series[1].data[j] = {
+              value: [this.dataset[j].x, this.dataset[j].y, this.dataset[j].ood_score],
+              itemStyle: {
+                color: '#ee6666'
+              }
+            };
+          } else {
+            option.series[1].data[j] = [this.dataset[j].x, this.dataset[j].y, this.dataset[j].ood_score];
+          }
+        }
+      }
+      myChart.setOption(option);
+    },
+    reset() {
+      let myChart = this.dimensionReductionChart;
+      let option = this.option;
+      for (let j = 0; j < this.dataset.length; j++) {
+        if (this.dataset[j] && this.dataset[j].label === '1') {
+          option.series[1].data[j] = [this.dataset[j].x, this.dataset[j].y, this.dataset[j].ood_score]
+        }
+      }
+      myChart.setOption(option);
+    },
+    exportPickedData() {
+      this.$nextTick(() => {
+        this.$bus.$emit('sentSelectedPointList', this.selectedPointList);
+      })
+    },
+    oodScoreToColor(selection) {
+      if (this.dimensionReductionChart._chartsViews) {
+        let myChart = this.dimensionReductionChart;
+        let option = this.option;
+        if (selection === 'true') {
+          option.visualMap = {
+            min: this.minOod,
+            max: this.maxOod,
+            range: [this.minOod, this.maxOod],
+            seriesIndex: 0,
+            dimension: 2,
+            orient: 'vertical',
+            precision: 4,
+            right: 10,
+            top: 'center',
+            text: ['HIGH', 'LOW'],
+            calculable: true,
+            realtime: false,
+            inRange: {
+              color: ['#313695',
+                '#4575b4',
+                '#74add1',
+                '#abd9e9',
+                '#e0f3f8',
+                '#ffffbf',
+                '#fee090',
+                '#fdae61',
+                '#f46d43',
+                '#d73027',
+                '#a50026']
+            }
+          };
+          option.series = {
+            name: '1',
+            type: 'scatter',
+            symbolSize: 6,
+            emphasis: {
+              focus: 'series'
+            },
+            data: this.dataset.map(function (item) {
+              if (item && !isNaN(item.ood_score) && item.label === '1') {
+                return [item.x, item.y, item.ood_score]
+              } else
+                return [null, null, 0]
+            })
+          }
+          delete option.legend;
+        } else {
+          delete option.visualMap;
+          option.series = [
+            {
+              name: '0',
+              type: 'scatter',
+              symbolSize: 6,
+              emphasis: {
+                focus: 'series'
+              },
+              // prettier-ignore
+              data: this.dataset.map(function (item) {
+                if (item && item.label === '0')
+                  return [item.x, item.y];
+              }),
+            },
+            {
+              name: '1',
+              type: 'scatter',
+              symbolSize: 6,
+              emphasis: {
+                focus: 'series'
+              },
+              // prettier-ignore
+              data: this.dataset.map(function (item) {
+                if (item && item.label === '1')
+                  return [item.x, item.y];
+              }),
+            },
+            {
+              name: '2',
+              type: 'scatter',
+              symbolSize: 6,
+              emphasis: {
+                focus: 'series'
+              },
+              // prettier-ignore
+              data: this.dataset.map(function (item) {
+                if (item && item.label === '2') {
+                  return [item.x, item.y];
+                }
+              }),
+            },
+          ]
+          option.legend = {
+            title: 'Legend',
+            data: ['0', '1', '2'],
+            left: 'center',
+            bottom: 10
+          }
+        }
+        myChart.clear()
+        myChart.setOption(option);
+      }
+    }
+  },
+  mounted() {
+    this.$bus.$on('sendProjectionMethod', (projectionMethod) => {
+      if (this.dimensionReductionChart) {
+        this.dimensionReductionChart.dispose()
+        this.selectedDelPointList = [];
+        this.selectedPointList = [];
+      }
+      if (projectionMethod === '无') {
+      } else if (projectionMethod === 'T-SNE算法') {
+        this.paint2('static/牛逼d.csv')
+      } else if (projectionMethod === '训练后T-SNE算法') {
+        this.paint2('static/data训练后TSNE.csv')
+      } else if (projectionMethod === 'PCA算法') {
+        this.paint2('static/pca牛逼d.csv')
+      } else if (projectionMethod === '训练后PCA算法') {
+        this.paint2('static/data训练后PCA.csv')
+      }
+    })
+    // 切换查找/删除功能
+    this.$bus.$on('sendSwitchSelectedFunc', (switchSelectedFunc) => {
+      this.selectedFunc = switchSelectedFunc;
+    });
+    this.$bus.$on('sendWithdraw', this.withdraw);
+    this.$bus.$on('sendWithdraw10', this.withdraw10);
+    this.$bus.$on('sendAnalyse', this.analyse);
+    this.$bus.$on('sendHistogramGroupNum', this.reset);
+    this.$bus.$on('exportPickedData', this.exportPickedData);
+    this.$bus.$on('sendOodScoreToColor', this.oodScoreToColor);
+  },
+}
+</script>
+
+<style scoped>
+#dim-red {
+  border: #409EFF 3px solid;
+  border-radius: 12px;
+  background: linear-gradient(to bottom, #409EFF 4%, #FFFFFF 30px);
+  /* width: 800px;*/
+  height: 706px;
+  margin-right: 20px;
+  width: 97%;
+}
+
+#dim-red-title {
+  text-align: center;
+  font: bold 20px "Microsoft YaHei";
+  color: #FFFFFF;
+}
+
+#dim-red-body {
+  text-align: left;
+  font: 16px/30px "Microsoft YaHei";
+  padding: 10px;
+}
+
+#MainSVG {
+  width: 100%;
+  height: 650px;
+}
+
+#main {
+  height: 650px;
+}
+</style>
