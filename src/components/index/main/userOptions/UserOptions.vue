@@ -18,24 +18,6 @@
             </el-select>
           </td>
         </tr>
-        <!--        <tr>
-                  <td class="user-options-body-text">是否显示真实数据</td>
-                  <td>
-                    <el-radio-group v-model="showRealData">
-                      <el-radio label="true">是</el-radio>
-                      <el-radio label="false">否</el-radio>
-                    </el-radio-group>
-                  </td>
-                </tr>-->
-        <!--        <tr>
-                  <td class="user-options-body-text">是否开启直方图分组显示</td>
-                  <td>
-                    <el-radio-group v-model="histogramGroup">
-                      <el-radio label="true">是</el-radio>
-                      <el-radio label="false">否</el-radio>
-                    </el-radio-group>
-                  </td>
-                </tr>-->
         <tr>
           <td class="user-options-body-text">设置直方图分组数量</td>
           <td>
@@ -45,46 +27,8 @@
                 size="small"
                 :disabled="projectionMethod==='无'">
             </el-input-number>
-            <!--            <el-input-number
-                            v-show="histogramGroup === 'false'"
-                            disabled
-                            v-model="histogramGroupNum"
-                            :min="1" :max="10"
-                            size="small">
-                        </el-input-number>-->
           </td>
         </tr>
-        <!--        <tr>
-                  <td class="user-options-body-text">是否开启挑选功能</td>
-                  <td>
-                    <el-radio-group v-model="pickData">
-                      <el-radio label="true">是</el-radio>
-                      <el-radio label="false">否</el-radio>
-                    </el-radio-group>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="user-options-body-text">是否开启框选功能</td>
-                  <td>
-                    <el-radio-group v-model="selectData">
-                      <el-radio label="true">是</el-radio>
-                      <el-radio label="false">否</el-radio>
-                    </el-radio-group>
-                  </td>
-                </tr>-->
-        <!--        <tr>
-                  <td class="user-options-body-text">是否开启删除功能</td>
-                  <td>
-                    <el-radio-group v-model="deleteData">
-                      <el-radio label="true">是</el-radio>
-                      <el-radio label="false">否</el-radio>
-                    </el-radio-group>
-                  <td/>
-                </tr>
-                <tr>
-                  <td class="user-options-body-text">撤回删除</td>
-                  <td style="text-align: left">撤回10个删除</td>
-                </tr>-->
         <tr>
           <td class="user-options-body-text">切换选中点集功能</td>
           <td>
@@ -100,11 +44,17 @@
           </td>
         </tr>
         <tr>
+          <td class="user-options-body-text"></td>
+          <td v-show="switchSelectedFunc">
+            <el-button type="danger" plain @click="deleteSelectedPoints">删除选中</el-button>
+          </td>
+        </tr>
+        <tr>
           <td class="user-options-body-text" v-show="switchSelectedFunc">
-            <el-button @click="withdraw" :disabled="oodScoreToColor === 'true'">撤回删除</el-button>
+            <el-button @click="withdraw">撤回删除</el-button>
           </td>
           <td v-show="switchSelectedFunc">
-            <el-button @click="withdraw10" :disabled="oodScoreToColor === 'true'">撤回10个删除</el-button>
+            <el-button @click="withdraw10">撤回10个删除</el-button>
           </td>
         </tr>
         <tr>
@@ -123,7 +73,7 @@
                 type="primary"
                 size="small"
                 @click="exportPickedData"
-                :disabled="projectionMethod==='无'||oodScoreToColor === 'true'||Boolean(allPicNum)&&allPicNum!==compressedPicNum">
+                :disabled="projectionMethod==='无'||Boolean(allPicNum)&&allPicNum!==compressedPicNum">
               导 出
             </el-button>
             <a :href="picHref" :download="picDownload" ref="download" v-show="false">导 出</a>
@@ -189,6 +139,9 @@ export default {
   methods: {
     exportPickedData() {
       this.$bus.$emit("exportPickedData");
+    },
+    deleteSelectedPoints() {
+      this.$bus.$emit("deleteSelectedPoints");
     },
     withdraw() {
       this.$bus.$emit("sendWithdraw", true);

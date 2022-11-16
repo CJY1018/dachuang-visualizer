@@ -15,7 +15,6 @@
 import * as d3 from 'd3';
 //引入echarts库
 import * as echarts from 'echarts';
-import ecStat from 'echarts-stat';
 
 export default {
   name: "DimensionReduction",
@@ -24,6 +23,7 @@ export default {
     return {
       dataset: [],
       selectedFunc: false, // false: 查看，true: 删除
+      selectedIndices1: [],
       selectedDelPointList: [],
       selectedPointList: [],
       minOod: 0,
@@ -142,7 +142,10 @@ export default {
               }
             }
           },
-          brush: {},
+          brush: {
+            throttleType: 'debounce',
+            throttleDelay: 300,
+          },
           legend: {
             title: 'Legend',
             data: ['0', '1', '2'],
@@ -157,6 +160,12 @@ export default {
                 formatter: '{value} px'
               },
               splitLine: {
+                show: true
+              },
+              axisLine: {
+                show: false
+              },
+              axisTick: {
                 show: false
               }
             }
@@ -169,6 +178,12 @@ export default {
                 formatter: '{value} px'
               },
               splitLine: {
+                show: true
+              },
+              axisLine: {
+                show: false
+              },
+              axisTick: {
                 show: false
               }
             }
@@ -178,39 +193,30 @@ export default {
               name: '0',
               type: 'scatter',
               symbolSize: 6,
-              emphasis: {
-                focus: 'series'
-              },
               // prettier-ignore
               data: this.dataset.map(function (item) {
                 if (item.label === '0')
-                  return [item.x, item.y];
+                  return [item.x, item.y, item.ood_score];
               }),
             },
             {
               name: '1',
               type: 'scatter',
               symbolSize: 6,
-              emphasis: {
-                focus: 'series'
-              },
               // prettier-ignore
               data: this.dataset.map(function (item) {
                 if (item.label === '1')
-                  return [item.x, item.y];
+                  return [item.x, item.y, item.ood_score];
               }),
             },
             {
               name: '2',
               type: 'scatter',
               symbolSize: 6,
-              emphasis: {
-                focus: 'series'
-              },
               // prettier-ignore
               data: this.dataset.map(function (item) {
                 if (item.label === '2') {
-                  return [item.x, item.y];
+                  return [item.x, item.y, null];
                 }
               }),
             },
@@ -225,55 +231,19 @@ export default {
         let bus = this.$bus;
 
         function renderBrushed(params) {
-          if (params.batch[0].selected[2] && params.batch[0].selected[1] && params.batch[0].selected[0]) {
+          if (params.batch[0].selected[1]) {
             // 输出被选中点的下标
-            let selectedIndices1 = params.batch[0].selected[0].dataIndex;
-            let selectedIndices2 = params.batch[0].selected[1].dataIndex;
-            let selectedIndices3 = params.batch[0].selected[2].dataIndex;
-            let length = selectedIndices1.length + selectedIndices2.length + selectedIndices3.length
+            let selectedIndices1 = params.batch[0].selected[1].dataIndex;
+            let length = selectedIndices1.length
 
-            if (_this.selectedFunc === false) { //查看
-              bus.$emit('sendPointsLength', selectedIndices1.length + selectedIndices2.length + selectedIndices3.length); // 发送被选中的点的数量
-              let selectedIndices = selectedIndices1.concat(selectedIndices2).concat(selectedIndices3);
-              let selectedPoints = [];
-              for (let i = 0; i < selectedIndices.length; i++) {
-                selectedPoints.push(_this.dataset[selectedIndices[i]]);
-              }
-              _this.selectedPointList = selectedPoints;
-            } else if (length > 0) { //删除
-              selectedIndices1.forEach(function (item) {
-                _this.selectedDelPointList.push({
-                  index: item,
-                  data: _this.dataset[item],
-                  type: 0
-                })
-                _this.dataset[item] = null;
-                option.series[0].data[item] = null;
-              });
-              selectedIndices2.forEach(function (item) {
-                _this.selectedDelPointList.push({
-                  index: item,
-                  data: _this.dataset[item],
-                  type: 1
-                })
-                _this.dataset[item] = null;
-                option.series[1].data[item] = null;
-              });
-              selectedIndices3.forEach(function (item) {
-                _this.selectedDelPointList.push({
-                  index: item,
-                  data: _this.dataset[item],
-                  type: 2
-                })
-                _this.dataset[item] = null;
-                option.series[2].data[item] = null;
-              });
-              myChart.setOption(option);
+            bus.$emit('sendPointsLength', length); // 发送被选中的点的数量
+            let selectedPoints = [];
+            for (let i = 0; i < length; i++) {
+              selectedPoints.push(_this.dataset[selectedIndices1[i]]);
             }
-          } else if (_this.dimensionReductionChart._chartsViews) {
-            bus.$emit('sendPointsLength', params.batch[0].selected[0].dataIndex.length); // 发送被选中的点的数量
+            _this.selectedIndices1 = selectedIndices1;
+            _this.selectedPointList = selectedPoints;
           }
-          // myChart.setOption(option);
         }
 
         let _this = this;
@@ -285,117 +255,41 @@ export default {
           if (_this.selectedFunc === false) { //查看
             _this.selectedPointList = [_this.dataset[params.dataIndex]];
             _this.$bus.$emit('sendSelectedPoint', _this.dataset[params.dataIndex]);
-          } else { //删除
+          } else if (params.seriesName === '1') { //删除
             _this.selectedDelPointList.push({
               index: params.dataIndex,
               data: _this.dataset[params.dataIndex],
               type: parseInt(params.seriesName)
             })
             _this.dataset[params.dataIndex] = null;
-            if (params.data.length === 2)
-              option.series[params.seriesIndex].data[params.dataIndex] = null;
-            else
-              option.series.data[params.dataIndex] = null;
+            option.series[params.seriesIndex].data[params.dataIndex] = null;
             myChart.setOption(option);
           }
         });
       });
     },
-    paint3() {
-      d3.csv("static/data训练后PCA.csv").then(dataset => {
-        let points1 = [];
-        let points2 = [];
-        let points3 = [];
-        for (let i = 0; i < dataset.length; i++) {
-          points1.push([parseFloat(dataset[i].x), parseFloat(dataset[i].y)]);
-          /*switch (dataset[i].label) {
-            case "0":
-              points1.push([parseFloat(dataset[i].x), parseFloat(dataset[i].y)]);
-              break;
-            case "1":
-              points2.push([parseFloat(dataset[i].x), parseFloat(dataset[i].y)]);
-              break;
-            case "2":
-              points3.push([parseFloat(dataset[i].x), parseFloat(dataset[i].y)]);
-              break;
-          }*/
-        }
-
-        var chartDom = document.getElementById('main');
-        var myChart = echarts.init(chartDom);
-        var option;
-
-// See https://github.com/ecomfe/echarts-stat
-        echarts.registerTransform(ecStat.transform.clustering);
-        var CLUSTER_COUNT = 6;
-        var DIENSIION_CLUSTER_INDEX = 2;
-        var COLOR_ALL = [
-          '#37A2DA',
-          '#e06343',
-          '#37a354',
-          '#b55dba',
-          '#b5bd48',
-          '#8378EA',
-          '#96BFFF'
-        ];
-        var pieces = [];
-        for (var i = 0; i < CLUSTER_COUNT; i++) {
-          pieces.push({
-            value: i,
-            label: 'cluster ' + i,
-            color: COLOR_ALL[i]
-          });
-        }
-        option = {
-          dataset: [
-            {
-              source: points1
-            },
-            {
-              transform: {
-                type: 'ecStat:clustering',
-                // print: true,
-                config: {
-                  clusterCount: CLUSTER_COUNT,
-                  outputType: 'single',
-                  outputClusterIndexDimension: DIENSIION_CLUSTER_INDEX
-                }
-              }
-            }
-          ],
-          tooltip: {
-            position: 'top'
-          },
-          visualMap: {
-            type: 'piecewise',
-            top: 'middle',
-            min: 0,
-            max: CLUSTER_COUNT,
-            left: 10,
-            splitNumber: CLUSTER_COUNT,
-            dimension: DIENSIION_CLUSTER_INDEX,
-            pieces: pieces
-          },
-          grid: {
-            left: 120
-          },
-          xAxis: {},
-          yAxis: {},
-          series: {
-            type: 'scatter',
-            encode: {tooltip: [0, 1]},
-            symbolSize: 15,
-            itemStyle: {
-              borderColor: '#555'
-            },
-            datasetIndex: 1
-          }
-        };
-
-        option && myChart.setOption(option);
-
-      })
-
+    deletePoints() {
+      if (this.selectedIndices1.length > 0) {
+        let myChart = this.dimensionReductionChart;
+        let option = this.option;
+        let selectedDelPointList = this.selectedDelPointList;
+        let dataset = this.dataset;
+        this.selectedIndices1.forEach(function (item) {
+          selectedDelPointList.push({
+            index: item,
+            data: dataset[item],
+            type: 1
+          })
+          dataset[item] = null;
+          option.series[1].data[item] = null;
+        });
+        myChart.setOption(option);
+        this.selectedIndices1 = [];
+        this.selectedPointList = [];
+        this.$bus.$emit('sendPointsLength', 0);
+      } else {
+        alert("请先选择要删除的点");
+      }
     },
     withdraw() {
       if (this.selectedDelPointList.length <= 0) {
@@ -410,7 +304,7 @@ export default {
       let index = tail.index
       let type = tail.type
       let data = tail.data;
-      option.series[type].data[index] = [data.x, data.y]
+      option.series[type].data[index] = [data.x, data.y, data.ood_score]
       this.dataset[index] = data;
       option.animation = false;
       myChart.setOption(option);
@@ -430,7 +324,7 @@ export default {
         let index = tail.index
         let type = tail.type
         let data = tail.data;
-        option.series[type].data[index] = [data.x, data.y]
+        option.series[type].data[index] = [data.x, data.y, data.ood_score]
         this.dataset[index] = data
       }
       option.animation = false;
@@ -475,7 +369,10 @@ export default {
     },
     exportPickedData() {
       this.$nextTick(() => {
-        this.$bus.$emit('sentSelectedPointList', this.selectedPointList);
+        if (this.selectedPointList.length > 0)
+          this.$bus.$emit('sentSelectedPointList', this.selectedPointList);
+        else
+          alert("请先选择要导出的点");
       })
     },
     oodScoreToColor(selection) {
@@ -487,7 +384,6 @@ export default {
             min: this.minOod,
             max: this.maxOod,
             range: [this.minOod, this.maxOod],
-            seriesIndex: 0,
             dimension: 2,
             orient: 'vertical',
             precision: 4,
@@ -510,65 +406,41 @@ export default {
                 '#a50026']
             }
           };
-          option.series = {
-            name: '1',
+          delete option.series[2]
+          option.series[0].data = this.dataset.map(function (item) {
+            if (item && !isNaN(item.ood_score) && item.label === '0') {
+              return [item.x, item.y, item.ood_score]
+            } else
+              return [null, null, 0]
+          })
+          option.series[1].data = this.dataset.map(function (item) {
+            if (item && !isNaN(item.ood_score) && item.label === '1') {
+              return [item.x, item.y, item.ood_score]
+            } else
+              return [null, null, 0]
+          })
+          option.legend = {
+            title: 'Legend',
+            data: ['0', '1'],
+            left: 'center',
+            bottom: 10
+          }
+        } else {
+          delete option.visualMap;
+          option.series[2] = {
+            name: '2',
             type: 'scatter',
             symbolSize: 6,
             emphasis: {
               focus: 'series'
             },
+            // prettier-ignore
             data: this.dataset.map(function (item) {
-              if (item && !isNaN(item.ood_score) && item.label === '1') {
-                return [item.x, item.y, item.ood_score]
-              } else
-                return [null, null, 0]
-            })
+              if (item && item.label === '2') {
+                return [item.x, item.y];
+              }
+            }),
           }
-          delete option.legend;
-        } else {
-          delete option.visualMap;
-          option.series = [
-            {
-              name: '0',
-              type: 'scatter',
-              symbolSize: 6,
-              emphasis: {
-                focus: 'series'
-              },
-              // prettier-ignore
-              data: this.dataset.map(function (item) {
-                if (item && item.label === '0')
-                  return [item.x, item.y];
-              }),
-            },
-            {
-              name: '1',
-              type: 'scatter',
-              symbolSize: 6,
-              emphasis: {
-                focus: 'series'
-              },
-              // prettier-ignore
-              data: this.dataset.map(function (item) {
-                if (item && item.label === '1')
-                  return [item.x, item.y];
-              }),
-            },
-            {
-              name: '2',
-              type: 'scatter',
-              symbolSize: 6,
-              emphasis: {
-                focus: 'series'
-              },
-              // prettier-ignore
-              data: this.dataset.map(function (item) {
-                if (item && item.label === '2') {
-                  return [item.x, item.y];
-                }
-              }),
-            },
-          ]
           option.legend = {
             title: 'Legend',
             data: ['0', '1', '2'],
@@ -603,11 +475,19 @@ export default {
     this.$bus.$on('sendSwitchSelectedFunc', (switchSelectedFunc) => {
       this.selectedFunc = switchSelectedFunc;
     });
+    // 删除选中
+    this.$bus.$on('deleteSelectedPoints', this.deletePoints);
+    // 撤回
     this.$bus.$on('sendWithdraw', this.withdraw);
+    // 撤回10个
     this.$bus.$on('sendWithdraw10', this.withdraw10);
+    // 分析
     this.$bus.$on('sendAnalyse', this.analyse);
+    // 重置
     this.$bus.$on('sendHistogramGroupNum', this.reset);
+    // 导出数据
     this.$bus.$on('exportPickedData', this.exportPickedData);
+    // ood分数颜色
     this.$bus.$on('sendOodScoreToColor', this.oodScoreToColor);
   },
 }
@@ -634,11 +514,6 @@ export default {
   text-align: left;
   font: 16px/30px "Microsoft YaHei";
   padding: 10px;
-}
-
-#MainSVG {
-  width: 100%;
-  height: 650px;
 }
 
 #main {
