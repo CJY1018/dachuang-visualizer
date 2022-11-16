@@ -498,7 +498,6 @@ export default {
   border: #409EFF 3px solid;
   border-radius: 12px;
   background: linear-gradient(to bottom, #409EFF 4%, #FFFFFF 30px);
-  /* width: 800px;*/
   height: 706px;
   margin-right: 20px;
   width: 97%;
