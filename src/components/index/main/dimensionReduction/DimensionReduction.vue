@@ -4,15 +4,12 @@
       降维显示效果图
     </div>
     <div id="dim-red-body">
-      <!--            <svg id="MainSVG" ref="MainSVG"></svg>-->
       <div id="main"></div>
     </div>
   </div>
 </template>
 
 <script>
-//引入d3库
-import * as d3 from 'd3';
 //引入echarts库
 import * as echarts from 'echarts';
 
@@ -33,42 +30,6 @@ export default {
   },
 
   methods: {
-    paint1() {
-      let width = this.$refs.MainSVG.clientWidth;
-      let height = this.$refs.MainSVG.clientHeight;
-      d3.csv("static/data训练后PCA.csv").then(dataset => {
-            //画散点图
-            d3.select('#MainSVG').selectAll('circle')
-                .data(dataset)
-                .enter()
-                .append('circle')
-                .attr('cx', function (d) {
-                  return d.x * 20 + width / 2.2;
-                })
-                .attr('cy', function (d) {
-                  return -d.y * 1500 + height / 2;
-                })
-                .attr('r', 3)
-                .attr('fill', function (d) {
-                  switch (d.label) {
-                    case '0':
-                      return 'green';
-                    case '1':
-                      return 'blue';
-                    case '2':
-                      return 'red';
-                  }
-                })
-          }
-      )
-      //屏幕缩放时
-      window.onresize = () => {
-        //清空画布
-        d3.select('#MainSVG').selectAll('circle').remove();
-        this.paint();
-      };
-
-    },
     paint2(filePath) {
       // 读取数据
       d3.csv(filePath).then(dataset => {
