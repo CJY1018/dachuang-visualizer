@@ -10,6 +10,8 @@
 </template>
 
 <script>
+//引入d3库
+import * as d3 from 'd3';
 //引入echarts库
 import * as echarts from 'echarts';
 
@@ -337,81 +339,85 @@ export default {
       })
     },
     oodScoreToColor(selection) {
-      if (this.dimensionReductionChart._chartsViews) {
-        let myChart = this.dimensionReductionChart;
-        let option = this.option;
-        if (selection === 'true') {
-          option.visualMap = {
-            min: this.minOod,
-            max: this.maxOod,
-            range: [this.minOod, this.maxOod],
-            dimension: 2,
-            orient: 'vertical',
-            precision: 4,
-            right: 10,
-            top: 'center',
-            text: ['HIGH', 'LOW'],
-            calculable: true,
-            realtime: false,
-            inRange: {
-              color: ['#313695',
-                '#4575b4',
-                '#74add1',
-                '#abd9e9',
-                '#e0f3f8',
-                '#ffffbf',
-                '#fee090',
-                '#fdae61',
-                '#f46d43',
-                '#d73027',
-                '#a50026']
-            }
-          };
-          delete option.series[2]
-          option.series[0].data = this.dataset.map(function (item) {
-            if (item && !isNaN(item.ood_score) && item.label === '0') {
-              return [item.x, item.y, item.ood_score]
-            } else
-              return [null, null, 0]
-          })
-          option.series[1].data = this.dataset.map(function (item) {
-            if (item && !isNaN(item.ood_score) && item.label === '1') {
-              return [item.x, item.y, item.ood_score]
-            } else
-              return [null, null, 0]
-          })
-          option.legend = {
-            title: 'Legend',
-            data: ['0', '1'],
-            left: 'center',
-            bottom: 10
+      console.log(this.dimensionReductionChart);
+      let myChart = this.dimensionReductionChart;
+      let option = this.option;
+      if (selection === 'true') {
+        option.visualMap = {
+          min: this.minOod,
+          max: this.maxOod,
+          range: [this.minOod, this.maxOod],
+          dimension: 2,
+          orient: 'vertical',
+          precision: 4,
+          right: 10,
+          top: 'center',
+          text: ['HIGH', 'LOW'],
+          calculable: true,
+          realtime: false,
+          inRange: {
+            color: ['#313695',
+              '#4575b4',
+              '#74add1',
+              '#abd9e9',
+              '#e0f3f8',
+              '#ffffbf',
+              '#fee090',
+              '#fdae61',
+              '#f46d43',
+              '#d73027',
+              '#a50026']
           }
-        } else {
-          delete option.visualMap;
-          option.series[2] = {
-            name: '2',
-            type: 'scatter',
-            symbolSize: 6,
-            emphasis: {
-              focus: 'series'
-            },
-            // prettier-ignore
-            data: this.dataset.map(function (item) {
-              if (item && item.label === '2') {
-                return [item.x, item.y];
-              }
-            }),
-          }
-          option.legend = {
-            title: 'Legend',
-            data: ['0', '1', '2'],
-            left: 'center',
-            bottom: 10
-          }
+        };
+        delete option.series[2]
+        option.series[0].data = this.dataset.map(function (item) {
+          if (item && !isNaN(item.ood_score) && item.label === '0') {
+            return [item.x, item.y, item.ood_score]
+          } else
+            return [null, null, 0]
+        })
+        option.series[0].emphasis = {
+          focus: 'series'
         }
-        myChart.clear()
-        myChart.setOption(option);
+        option.series[1].data = this.dataset.map(function (item) {
+          if (item && !isNaN(item.ood_score) && item.label === '1') {
+            return [item.x, item.y, item.ood_score]
+          } else
+            return [null, null, 0]
+        })
+        option.series[1].emphasis = {
+          focus: 'series',
+        }
+        option.legend = {
+          title: 'Legend',
+          data: ['0', '1'],
+          left: 'center',
+          bottom: 10
+        }
+      } else {
+        delete option.visualMap;
+        delete option.series[0].emphasis;
+        delete option.series[1].emphasis;
+        option.series[2] = {
+          name: '2',
+          type: 'scatter',
+          symbolSize: 6,
+          // prettier-ignore
+          data: this.dataset.map(function (item) {
+            if (item && item.label === '2') {
+              return [item.x, item.y];
+            }
+          }),
+        }
+        option.legend = {
+          title: 'Legend',
+          data: ['0', '1', '2'],
+          left: 'center',
+          bottom: 10
+        }
       }
+      myChart.clear()
+      myChart.setOption(option);
     }
   },
   mounted() {
