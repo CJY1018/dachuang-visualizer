@@ -21,6 +21,7 @@ export default {
   data() {
     return {
       dataset: [],
+      allPoints: {},
       selectedFunc: false, // false: 查看，true: 删除
       selectedIndices1: [],
       selectedDelPointList: [],
@@ -32,26 +33,41 @@ export default {
   },
 
   methods: {
-    paint2(filePath) {
+    paint(filePath) {
       // 读取数据
       d3.csv(filePath).then(dataset => {
+        // 保存数据集
         this.dataset = dataset;
         let ood = [];
-        let maxOod = this.dataset[0].ood_score, minOod = this.dataset[0].ood_score;
-        for (let i = 0; i < this.dataset.length; i++) {
-          if (!isNaN(this.dataset[i].ood_score)) {
-            this.dataset[i].ood_score = parseFloat(this.dataset[i].ood_score);
-            ood.push(this.dataset[i].ood_score);
-            //找到最大最小值
-            if (this.dataset[i].ood_score > maxOod) {
-              maxOod = this.dataset[i].ood_score;
-            } else if (this.dataset[i].ood_score < minOod) {
-              minOod = this.dataset[i].ood_score;
-            }
+        let maxOod = parseFloat(dataset[0].ood_score), minOod = parseFloat(dataset[0].ood_score);
+        let points_0 = [], points_1 = [], points_2 = [];
+        let allPoints = {};
+        dataset.forEach((data) => {
+          switch (data.label) {
+            case "0":
+              points_0.push(data);
+              break;
+            case "1":
+              let ood_score = parseFloat(data.ood_score);
+              points_1.push(data);
+              ood.push(ood_score);
+              minOod = Math.min(minOod, ood_score);
+              maxOod = Math.max(maxOod, ood_score);
+              break;
+            case "2":
+              points_2.push(data);
+              break;
           }
-        }
+        })
+        // 保存最大最小值
         this.minOod = minOod;
         this.maxOod = maxOod;
+        // 保存全部点
+        this.allPoints = allPoints = {
+          0: points_0,
+          1: points_1,
+          2: points_2,
+        }
 
         // 发送ood_score区间
         this.$bus.$emit('sendOodScoreRange', minOod, maxOod);
@@ -99,15 +115,61 @@ export default {
           },
           toolbox: {
             feature: {
+              dataView: {
+                readOnly: true,
+                optionToContent: function (param) {
+                  let series = param.series;
+                  let table = '<table id="testtable" ' +
+                      'style="width:100%;text-align:center;' +
+                      'border-collapse: collapse;' +
+                      'margin-bottom: 20px" border="1">' +
+                      '<thead><tr>'
+                      + '<th>id</th>'
+                      + '<th>label</label></th>'
+                      + '<th>x</th>'
+                      + '<th>y</th>'
+                      + '<th>ood_score</th>'
+                      + '</tr></thead><tbody>';
+                  let row = 1;
+                  for (let i = 0; i < series.length; i++) {
+                    for (let j = 0; j < series[i].data.length; j++, row++) {
+                      if (j % 2)
+                        table += '<tr style="background-color: #FFFFFF">'
+                      else
+                        table += '<tr style="background-color: #f1f1f1">'
+                      table += '<td>' + row + '</td>'
+                          + '<td>' + i + '</td>'
+                          + '<td>' + series[i].data[j][0] + '</td>'
+                          + '<td>' + series[i].data[j][1] + '</td>'
+                          + '<td>' + series[i].data[j][2] + '</td>'
+                          + '</tr>';
+                    }
+                  }
+                  table += '</tbody></table>';
+                  return table;
+                }
+              },
               dataZoom: {},
               brush: {
-                type: ['rect', 'polygon', 'clear']
-              }
-            }
+                type: ['rect', 'polygon', 'keep', 'clear'],
+              },
+              saveAsImage: {
+                pixelRatio: 2,
+              },
+            },
           },
           brush: {
             throttleType: 'debounce',
             throttleDelay: 300,
+            seriesIndex: [1],
+            inBrush: {
+              symbol: 'emptyCircle',
+              symbolSize: 6,
+              color: '#ee6666',
+            },
+            outOfBrush: {
+              colorAlpha: 1
+            }
           },
           legend: {
             title: 'Legend',
@@ -157,9 +219,8 @@ export default {
               type: 'scatter',
               symbolSize: 6,
               // prettier-ignore
-              data: this.dataset.map(function (item) {
-                if (item.label === '0')
-                  return [item.x, item.y, item.ood_score];
+              data: points_0.map((data) => {
+                return [data.x, data.y];
               }),
             },
             {
@@ -167,9 +228,8 @@ export default {
               type: 'scatter',
               symbolSize: 6,
               // prettier-ignore
-              data: this.dataset.map(function (item) {
-                if (item.label === '1')
-                  return [item.x, item.y, item.ood_score];
+              data: points_1.map((data) => {
+                return [data.x, data.y, data.ood_score];
               }),
             },
             {
@@ -177,10 +237,8 @@ export default {
               type: 'scatter',
               symbolSize: 6,
               // prettier-ignore
-              data: this.dataset.map(function (item) {
-                if (item.label === '2') {
-                  return [item.x, item.y, null];
-                }
+              data: points_2.map((data) => {
+                return [data.x, data.y];
               }),
             },
           ]
@@ -194,18 +252,43 @@ export default {
         let bus = this.$bus;
 
         function renderBrushed(params) {
-          if (params.batch[0].selected[1]) {
+          console.log(params);
+          if (params.batch[0].selected[0]) {
+            let index1 = 0
+            for (let i = 0; i < params.batch[0].selected.length; i++) {
+              if (params.batch[0].selected[i].seriesIndex === 1) {
+                index1 = i;
+                break;
+              }
+            }
             // 输出被选中点的下标
-            let selectedIndices1 = params.batch[0].selected[1].dataIndex;
+            let selectedIndices1 = params.batch[0].selected[index1].dataIndex;
             let length = selectedIndices1.length
 
             bus.$emit('sendPointsLength', length); // 发送被选中的点的数量
             let selectedPoints = [];
-            for (let i = 0; i < length; i++) {
-              selectedPoints.push(_this.dataset[selectedIndices1[i]]);
+            selectedIndices1.forEach((index) => {
+              selectedPoints.push(allPoints[1][index]);
+              /* option.series[1].data[index] = {
+             value: [allPoints[1][index].x, allPoints[1][index].y, allPoints[1][index].ood_score],
+             itemStyle: {
+               color: '#ee6666'
+             }
+           }*/
+            })
+            /*allPoints[1].forEach((point, index) => {
+          if (!selectedIndices1.includes(index)) {
+            option.series[1].data[index] = {
+              value: [point.x, point.y, point.ood_score],
+              itemStyle: {
+                color: '#91cc75'
+              }
             }
+          }
+        })*/
             _this.selectedIndices1 = selectedIndices1;
             _this.selectedPointList = selectedPoints;
+            myChart.setOption(option);
           }
         }
 
@@ -216,36 +299,40 @@ export default {
         // 点击点时
         myChart.on('click', function (params) {
           if (_this.selectedFunc === false) { //查看
-            _this.selectedPointList = [_this.dataset[params.dataIndex]];
-            _this.$bus.$emit('sendSelectedPoint', _this.dataset[params.dataIndex]);
-          } else if (params.seriesName === '1') { //删除
+            _this.selectedPointList = [allPoints[params.seriesIndex][params.dataIndex]];
+            _this.$bus.$emit('sendSelectedPoint', allPoints[params.seriesIndex][params.dataIndex]);
+          } else if (params.seriesIndex === 1) { //删除
             _this.selectedDelPointList.push({
               index: params.dataIndex,
-              data: _this.dataset[params.dataIndex],
-              type: parseInt(params.seriesName)
+              data: allPoints[params.seriesIndex][params.dataIndex],
             })
-            _this.dataset[params.dataIndex] = null;
-            option.series[params.seriesIndex].data[params.dataIndex] = null;
+            allPoints[params.seriesIndex][params.dataIndex] = null;
+            if (params.seriesIndex === 1)
+              option.series[params.seriesIndex].data[params.dataIndex] = [null, null, null];
+            else
+              option.series[params.seriesIndex].data[params.dataIndex] = null;
             myChart.setOption(option);
           }
         });
       });
     },
+
     deletePoints() {
       if (this.selectedIndices1.length > 0) {
         let myChart = this.dimensionReductionChart;
         let option = this.option;
         let selectedDelPointList = this.selectedDelPointList;
-        let dataset = this.dataset;
-        this.selectedIndices1.forEach(function (item) {
+        let allPoints = this.allPoints;
+
+        this.selectedIndices1.forEach(function (index) {
           selectedDelPointList.push({
-            index: item,
-            data: dataset[item],
-            type: 1
+            index: index,
+            data: allPoints[1][index],
           })
-          dataset[item] = null;
-          option.series[1].data[item] = null;
+          allPoints[1][index] = null;
+          option.series[1].data[index] = [null, null, null];
         });
+
         myChart.setOption(option);
         this.selectedIndices1 = [];
         this.selectedPointList = [];
@@ -259,16 +346,14 @@ export default {
         alert("已经没有删除的点可以撤回了哟~")
         return;
       }
-      /*let myChart = echarts.init(this.chartDom);
-      let option = this.option;*/
       let myChart = this.dimensionReductionChart;
       let option = this.option;
       let tail = this.selectedDelPointList.pop();
-      let index = tail.index
-      let type = tail.type
+      let index = tail.index;
       let data = tail.data;
-      option.series[type].data[index] = [data.x, data.y, data.ood_score]
-      this.dataset[index] = data;
+      let type = parseInt(tail.data.label);
+      option.series[type].data[index] = [data.x, data.y, data.ood_score];
+      this.allPoints[type][index] = data;
       option.animation = false;
       myChart.setOption(option);
       option.animation = true;
@@ -284,11 +369,11 @@ export default {
       let length = this.selectedDelPointList.length;
       for (let i = 0; i < Math.min(length, 10); i++) {
         let tail = this.selectedDelPointList.pop();
-        let index = tail.index
-        let type = tail.type
+        let index = tail.index;
         let data = tail.data;
-        option.series[type].data[index] = [data.x, data.y, data.ood_score]
-        this.dataset[index] = data
+        let type = parseInt(tail.data.label);
+        option.series[type].data[index] = [data.x, data.y, data.ood_score];
+        this.allPoints[type][index] = data;
       }
       option.animation = false;
       myChart.setOption(option);
@@ -300,21 +385,21 @@ export default {
       let option = this.option;
       // 定义分组的宽度
       let groupWidth = (this.maxOod - this.minOod) / selectedGroup.length;
-      for (let j = 0; j < this.dataset.length; j++) {
-        if (this.dataset[j] && this.dataset[j].label === '1') {
-          let index = Math.floor((this.dataset[j].ood_score - this.minOod) / groupWidth);
+      for (let i = 0; i < this.allPoints[1].length; i++) {
+        if (this.allPoints[1][i]) {
+          let index = Math.floor((parseFloat(this.allPoints[1][i].ood_score) - this.minOod) / groupWidth);
           if (index >= selectedGroup.length) {
             index = this.groupNum - 1;
           }
           if (selectedGroup[index]) {
-            option.series[1].data[j] = {
-              value: [this.dataset[j].x, this.dataset[j].y, this.dataset[j].ood_score],
+            option.series[1].data[i] = {
+              value: [this.allPoints[1][i].x, this.allPoints[1][i].y, this.allPoints[1][i].ood_score],
               itemStyle: {
                 color: '#ee6666'
               }
             };
           } else {
-            option.series[1].data[j] = [this.dataset[j].x, this.dataset[j].y, this.dataset[j].ood_score];
+            option.series[1].data[i] = [this.allPoints[1][i].x, this.allPoints[1][i].y, this.allPoints[1][i].ood_score];
           }
         }
       }
@@ -323,11 +408,10 @@ export default {
     reset() {
       let myChart = this.dimensionReductionChart;
       let option = this.option;
-      for (let j = 0; j < this.dataset.length; j++) {
-        if (this.dataset[j] && this.dataset[j].label === '1') {
-          option.series[1].data[j] = [this.dataset[j].x, this.dataset[j].y, this.dataset[j].ood_score]
-        }
-      }
+      this.allPoints[1].forEach(function (point, index) {
+        if (point)
+          option.series[1].data[index] = [point.x, point.y, point.ood_score];
+      });
       myChart.setOption(option);
     },
     exportPickedData() {
@@ -339,14 +423,14 @@ export default {
       })
     },
     oodScoreToColor(selection) {
-      console.log(this.dimensionReductionChart);
       let myChart = this.dimensionReductionChart;
       let option = this.option;
       if (selection === 'true') {
         option.visualMap = {
+          type: 'continuous',
           min: this.minOod,
           max: this.maxOod,
-          range: [this.minOod, this.maxOod],
+          seriesIndex: 1,
           dimension: 2,
           orient: 'vertical',
           precision: 4,
@@ -367,24 +451,12 @@ export default {
               '#f46d43',
               '#d73027',
               '#a50026']
-          }
+          },
         };
         delete option.series[2]
-        option.series[0].data = this.dataset.map(function (item) {
-          if (item && !isNaN(item.ood_score) && item.label === '0') {
-            return [item.x, item.y, item.ood_score]
-          } else
-            return [null, null, 0]
-        })
         option.series[0].emphasis = {
           focus: 'series'
         }
-        option.series[1].data = this.dataset.map(function (item) {
-          if (item && !isNaN(item.ood_score) && item.label === '1') {
-            return [item.x, item.y, item.ood_score]
-          } else
-            return [null, null, 0]
-        })
         option.series[1].emphasis = {
           focus: 'series',
         }
@@ -403,10 +475,8 @@ export default {
           type: 'scatter',
           symbolSize: 6,
           // prettier-ignore
-          data: this.dataset.map(function (item) {
-            if (item && item.label === '2') {
-              return [item.x, item.y];
-            }
+          data: this.allPoints[2].map((data) => {
+            return [data.x, data.y];
           }),
         }
         option.legend = {
@@ -421,6 +491,7 @@ export default {
     }
   },
   mounted() {
+    // 初始化/切换界面
     this.$bus.$on('sendProjectionMethod', (projectionMethod) => {
       if (this.dimensionReductionChart) {
         this.dimensionReductionChart.dispose()
@@ -429,13 +500,13 @@ export default {
       }
       if (projectionMethod === '无') {
       } else if (projectionMethod === 'T-SNE算法') {
-        this.paint2('static/牛逼d.csv')
+        this.paint('static/牛逼d.csv')
       } else if (projectionMethod === '训练后T-SNE算法') {
-        this.paint2('static/data训练后TSNE.csv')
+        this.paint('static/data训练后TSNE.csv')
       } else if (projectionMethod === 'PCA算法') {
-        this.paint2('static/pca牛逼d.csv')
+        this.paint('static/pca牛逼d.csv')
       } else if (projectionMethod === '训练后PCA算法') {
-        this.paint2('static/data训练后PCA.csv')
+        this.paint('static/data训练后PCA.csv')
       }
     })
     // 切换查找/删除功能

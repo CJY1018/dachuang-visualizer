@@ -24,6 +24,8 @@ import {
     Image,
     Backtop,
     Progress,
+    Table,
+    TableColumn,
 } from 'element-ui';
 
 Vue.component(Button.name, Button);
@@ -46,9 +48,11 @@ Vue.component(InputNumber.name, InputNumber);
 Vue.component(Row.name, Row);
 Vue.component(Col.name, Col);
 Vue.component(Switch.name, Switch);
-Vue.component(Image.name,Image);
-Vue.component(Backtop.name,Backtop);
-Vue.component(Progress.name,Progress);
+Vue.component(Image.name, Image);
+Vue.component(Backtop.name, Backtop);
+Vue.component(Progress.name, Progress);
+Vue.component(Table.name, Table);
+Vue.component(TableColumn.name, TableColumn);
 
 Vue.config.productionTip = false
 
