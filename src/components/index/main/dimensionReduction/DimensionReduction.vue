@@ -159,13 +159,15 @@ export default {
             },
           },
           brush: {
+            xAxisIndex: 'all',
+            yAxisIndex: 'all',
             throttleType: 'debounce',
             throttleDelay: 300,
             seriesIndex: [1],
             inBrush: {
+              color: '#ee6666',
               symbol: 'emptyCircle',
               symbolSize: 6,
-              color: '#ee6666',
             },
             outOfBrush: {
               colorAlpha: 1
@@ -252,7 +254,6 @@ export default {
         let bus = this.$bus;
 
         function renderBrushed(params) {
-          console.log(params);
           if (params.batch[0].selected[0]) {
             let index1 = 0
             for (let i = 0; i < params.batch[0].selected.length; i++) {
