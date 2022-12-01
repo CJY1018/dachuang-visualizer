@@ -115,6 +115,9 @@ export default {
           },
           toolbox: {
             feature: {
+              brush: {
+                type: ['rect', 'polygon', 'keep', 'clear'],
+              },
               dataView: {
                 readOnly: true,
                 optionToContent: function (param) {
@@ -149,15 +152,20 @@ export default {
                   return table;
                 }
               },
-              dataZoom: {},
-              brush: {
-                type: ['rect', 'polygon', 'keep', 'clear'],
-              },
               saveAsImage: {
                 pixelRatio: 2,
               },
             },
           },
+          dataZoom: [{
+            type: 'inside',
+            filterMode: 'none',
+            xAxisIndex: 0,
+          }, {
+            type: 'inside',
+            filterMode: 'none',
+            yAxisIndex: 0,
+          }],
           brush: {
             xAxisIndex: 'all',
             yAxisIndex: 'all',
