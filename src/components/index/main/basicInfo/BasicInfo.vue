@@ -1,7 +1,7 @@
 <template>
   <div id="basic-info">
     <div id="basic-info-title">
-      基本信息
+      A. 基本信息显示区
     </div>
     <div id="basic-info-body">
       图片名：{{ imgName }}<br/>
@@ -65,13 +65,16 @@ export default {
 
 #basic-info-title {
   text-align: center;
-  font: bold 20px "Microsoft YaHei";
+  font:bold 20px "HarmonyOS_Sans_SC_Black";
+  -webkit-font-smoothing: antialiased;
   color: #FFFFFF;
 }
 
 #basic-info-body {
   text-align: left;
-  font: 16px/30px "Microsoft YaHei";
+  font: 15px/30px "HarmonyOS_Sans_SC_Medium";
+  -webkit-font-smoothing: antialiased;
+  color: #18191C;
   padding: 10px;
 }
 

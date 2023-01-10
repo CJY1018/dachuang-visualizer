@@ -1,7 +1,7 @@
 <template>
   <div id="visual-analysis">
     <div id="visual-analysis-title">
-      可视化分析区
+      D. 直方图分析区
     </div>
     <div id="visual-analysis-body">
       <div id="visual-analysis-main">
@@ -70,12 +70,18 @@ export default {
       let myChart = echarts.init(chartDom);
       let option;
 
+      let minOod = this.minOod;
       option = {
         tooltip: {
           trigger: 'axis',
           axisPointer: {
             type: 'shadow'
           }
+        },
+        formatter: function (params) {
+          let low = (minOod + (parseInt(params[0].name) - 1) * groupWidth).toFixed(5);
+          let high = (minOod + parseInt(params[0].name) * groupWidth).toFixed(5);
+          return '分组区间：[' + low + ', ' + high + ']<br/>数量：' + params[0].value;
         },
         grid: {
           top: 20,
@@ -96,7 +102,8 @@ export default {
         series: [
           {
             data: groupCount,
-            type: 'bar'
+            type: 'bar',
+            barWidth: '99.3%',
           }
         ]
       };
@@ -162,7 +169,8 @@ export default {
 
 #visual-analysis-title {
   text-align: center;
-  font: bold 20px "Microsoft YaHei";
+  font: bold 20px "HarmonyOS_Sans_SC_Black";
+  -webkit-font-smoothing:antialiased;
   color: #FFFFFF;
 }
 

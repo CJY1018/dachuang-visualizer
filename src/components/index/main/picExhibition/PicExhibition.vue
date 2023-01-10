@@ -1,7 +1,7 @@
 <template>
   <div id="pic-exhibition">
     <div id="pic-exhibition-title">
-      数据图片展示区
+      E. 图像数据显示区
     </div>
     <div id="pic-exhibition-body">
       <el-image
@@ -63,12 +63,14 @@ export default {
 
 #pic-exhibition-title {
   text-align: center;
-  font: bold 20px "Microsoft YaHei";
+  font: bold 20px "HarmonyOS_Sans_SC_Black";
+  -webkit-font-smoothing:antialiased;
   color: #FFFFFF;
 }
 
 #pic-exhibition-body {
-  font: 16px/30px "Microsoft YaHei";
+  font: 15px/30px "HarmonyOS_Sans_SC_Medium";
+  -webkit-font-smoothing:antialiased;
   padding: 10px;
   text-align: center;
 }

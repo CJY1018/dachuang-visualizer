@@ -1,7 +1,7 @@
 <template>
   <div id="dim-red">
     <div id="dim-red-title">
-      降维显示效果图
+      C. 降维数据筛选区
     </div>
     <div id="dim-red-body">
       <div id="main"></div>
@@ -79,9 +79,9 @@ export default {
         let option;
 
         option = {
-          title: {
-            text: 'Old points and new points distribution',
-          },
+          // title: {
+          //   text: 'Old points and new points distribution',
+          // },
           grid: {
             left: '3%',
             right: '7%',
@@ -552,7 +552,8 @@ export default {
 
 #dim-red-title {
   text-align: center;
-  font: bold 20px "Microsoft YaHei";
+  font: bold 20px "HarmonyOS_Sans_SC_Black";
+  -webkit-font-smoothing:antialiased;
   color: #FFFFFF;
 }
 

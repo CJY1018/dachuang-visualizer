@@ -1,7 +1,7 @@
 <template>
   <div id="user-options">
     <div id="user-options-title">
-      用户选项
+      B. 用户选项区
     </div>
     <div id="user-options-body">
       <table style="width: 290px">
@@ -43,22 +43,15 @@
             </el-switch>
           </td>
         </tr>
-        <tr>
-          <td class="user-options-body-text"></td>
-          <td v-show="switchSelectedFunc">
-            <el-button type="danger" plain @click="deleteSelectedPoints">删除选中</el-button>
+        <tr v-show="switchSelectedFunc" style="width: 300px">
+          <td colspan="3">
+            <el-button type="primary" plain @click="withdraw" size="small">撤回删除</el-button>
+            <el-button @click="withdraw10" size="small">撤回10个</el-button>
+            <el-button type="danger" plain @click="deleteSelectedPoints" size="small">删除选中</el-button>
           </td>
         </tr>
         <tr>
-          <td class="user-options-body-text" v-show="switchSelectedFunc">
-            <el-button @click="withdraw">撤回删除</el-button>
-          </td>
-          <td v-show="switchSelectedFunc">
-            <el-button @click="withdraw10">撤回10个删除</el-button>
-          </td>
-        </tr>
-        <tr>
-          <td class="user-options-body-text">是否将ood得分映射到颜色值域</td>
+          <td class="user-options-body-text">显示ood得分热力图</td>
           <td>
             <el-radio-group v-model="oodScoreToColor" :disabled="projectionMethod==='无'">
               <el-radio label="true">是</el-radio>
@@ -212,19 +205,25 @@ export default {
 
 #user-options-title {
   text-align: center;
-  font: bold 20px "Microsoft YaHei";
+  font: bold 20px "HarmonyOS_Sans_SC_Black";
+  -webkit-font-smoothing: antialiased;
   color: #FFFFFF;
 }
 
 #user-options-body {
   text-align: center;
-  font: 15px/30px "Microsoft YaHei";
   padding: 10px;
+}
+
+table {
+  border-collapse: collapse;
 }
 
 .user-options-body-text {
   text-align: left;
-  font: 16px/30px "Microsoft YaHei";
+  font: 15px/60px "HarmonyOS_Sans_SC_Medium";
+  -webkit-font-smoothing: antialiased;
+  color: #18191C;
   width: 180px;
 }
 
